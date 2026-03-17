@@ -1,86 +1,87 @@
+/**
+ * HotelInventoryApp
+ *
+ * This program demonstrates centralized inventory management for hotel rooms
+ * using a HashMap. Instead of storing availability in scattered variables,
+ * all room availability is stored in a single data structure managed by
+ * the RoomInventory class.
+ *
+ * The application initializes inventory, updates availability,
+ * and displays the current inventory state.
+ *
+ * @author Aman Jain
+ * @version 1.0
+ */
+
+import java.util.HashMap;
+import java.util.Map;
+
 public class Book_My_Stay_App {
 
     public static void main(String[] args) {
 
-        // Creating room objects (Polymorphism)
-        Room singleRoom = new SingleRoom();
-        Room doubleRoom = new DoubleRoom();
-        Room suiteRoom = new SuiteRoom();
+        // Initialize inventory
+        RoomInventory inventory = new RoomInventory();
 
-        // Availability stored using simple variables
-        int singleAvailability = 5;
-        int doubleAvailability = 3;
-        int suiteAvailability = 2;
+        // Display initial inventory
+        System.out.println("Initial Room Inventory:");
+        inventory.displayInventory();
 
-        System.out.println("Hotel Room Availability\n");
+        // Update availability
+        inventory.updateAvailability("Single", -1); // One single room booked
+        inventory.updateAvailability("Suite", 1);   // One suite added
 
-        // Display details
-        singleRoom.displayRoomDetails();
-        System.out.println("Available Rooms: " + singleAvailability + "\n");
-
-        doubleRoom.displayRoomDetails();
-        System.out.println("Available Rooms: " + doubleAvailability + "\n");
-
-        suiteRoom.displayRoomDetails();
-        System.out.println("Available Rooms: " + suiteAvailability + "\n");
-
-        System.out.println("Application terminated.");
+        // Display updated inventory
+        System.out.println("\nUpdated Room Inventory:");
+        inventory.displayInventory();
     }
 }
 
 /**
- * Abstract Room class defining common attributes and behavior
+ * RoomInventory
+ *
+ * Responsible for managing room availability across the system.
+ * All availability data is stored in a centralized HashMap.
  */
-abstract class Room {
+class RoomInventory {
 
-    protected String roomType;
-    protected int beds;
-    protected int size;
-    protected double price;
+    private Map<String, Integer> roomAvailability;
 
-    public void displayRoomDetails() {
-        System.out.println("Room Type: " + roomType);
-        System.out.println("Beds: " + beds);
-        System.out.println("Size: " + size + " sqm");
-        System.out.println("Price per night: $" + price);
+    /**
+     * Constructor initializes room inventory
+     */
+    public RoomInventory() {
+
+        roomAvailability = new HashMap<>();
+
+        roomAvailability.put("Single", 5);
+        roomAvailability.put("Double", 3);
+        roomAvailability.put("Suite", 2);
     }
-}
 
-/**
- * Single Room implementation
- */
-class SingleRoom extends Room {
-
-    public SingleRoom() {
-        roomType = "Single Room";
-        beds = 1;
-        size = 20;
-        price = 100;
+    /**
+     * Retrieve availability of a specific room type
+     */
+    public int getAvailability(String roomType) {
+        return roomAvailability.getOrDefault(roomType, 0);
     }
-}
 
-/**
- * Double Room implementation
- */
-class DoubleRoom extends Room {
+    /**
+     * Update availability in a controlled way
+     */
+    public void updateAvailability(String roomType, int change) {
 
-    public DoubleRoom() {
-        roomType = "Double Room";
-        beds = 2;
-        size = 30;
-        price = 150;
+        int current = roomAvailability.getOrDefault(roomType, 0);
+        roomAvailability.put(roomType, current + change);
     }
-}
 
-/**
- * Suite Room implementation
- */
-class SuiteRoom extends Room {
+    /**
+     * Display full inventory state
+     */
+    public void displayInventory() {
 
-    public SuiteRoom() {
-        roomType = "Suite Room";
-        beds = 3;
-        size = 50;
-        price = 300;
+        for (Map.Entry<String, Integer> entry : roomAvailability.entrySet()) {
+            System.out.println(entry.getKey() + " Rooms Available: " + entry.getValue());
+        }
     }
 }
