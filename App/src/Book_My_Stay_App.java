@@ -1,151 +1,100 @@
 /**
- * HotelSearchApp
+ * BookingQueueApp
  *
- * Demonstrates a read-only room search operation in a hotel booking system.
- * Guests can view available room types and their details without modifying
- * system inventory.
+ * Demonstrates how booking requests are collected using a Queue
+ * to preserve arrival order before any room allocation occurs.
  *
  * Concepts demonstrated:
- * - Read-only access
- * - Separation of concerns
- * - Defensive programming
- * - Domain model usage
- * - HashMap inventory management
+ * - Queue Data Structure
+ * - FIFO (First-In-First-Out)
+ * - Fair request ordering
+ * - Decoupling request intake from allocation
  *
  * @author Aman Jain
  * @version 1.0
  */
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.LinkedList;
+import java.util.Queue;
 
-public class Book_My_Stay_App{
+public class Book_My_Stay_App {
 
     public static void main(String[] args) {
 
-        // Initialize inventory
-        RoomInventory inventory = new RoomInventory();
+        // Initialize booking queue
+        BookingRequestQueue bookingQueue = new BookingRequestQueue();
 
-        // Create room domain objects
-        Room single = new SingleRoom();
-        Room doubleRoom = new DoubleRoom();
-        Room suite = new SuiteRoom();
+        // Guests submit booking requests
+        bookingQueue.addRequest(new Reservation("Guest1", "Single"));
+        bookingQueue.addRequest(new Reservation("Guest2", "Double"));
+        bookingQueue.addRequest(new Reservation("Guest3", "Suite"));
+        bookingQueue.addRequest(new Reservation("Guest4", "Single"));
 
-        // Register rooms in a domain map
-        Map<String, Room> roomCatalog = new HashMap<>();
-        roomCatalog.put("Single", single);
-        roomCatalog.put("Double", doubleRoom);
-        roomCatalog.put("Suite", suite);
+        // Display queued requests
+        System.out.println("\nCurrent Booking Request Queue:");
+        bookingQueue.displayQueue();
 
-        // Create search service
-        SearchService searchService = new SearchService(inventory, roomCatalog);
-
-        // Guest searches for available rooms
-        searchService.displayAvailableRooms();
+        System.out.println("\nRequests are waiting for allocation...");
     }
 }
 
 /**
- * Room domain model
- */
-abstract class Room {
-
-    protected String type;
-    protected int beds;
-    protected double price;
-
-    public void displayDetails() {
-        System.out.println("Room Type: " + type);
-        System.out.println("Beds: " + beds);
-        System.out.println("Price per night: $" + price);
-    }
-}
-
-class SingleRoom extends Room {
-
-    public SingleRoom() {
-        type = "Single";
-        beds = 1;
-        price = 100;
-    }
-}
-
-class DoubleRoom extends Room {
-
-    public DoubleRoom() {
-        type = "Double";
-        beds = 2;
-        price = 150;
-    }
-}
-
-class SuiteRoom extends Room {
-
-    public SuiteRoom() {
-        type = "Suite";
-        beds = 3;
-        price = 300;
-    }
-}
-
-/**
- * Centralized inventory management
- */
-class RoomInventory {
-
-    private Map<String, Integer> availability = new HashMap<>();
-
-    public RoomInventory() {
-        availability.put("Single", 5);
-        availability.put("Double", 3);
-        availability.put("Suite", 0); // Suite unavailable
-    }
-
-    public int getAvailability(String roomType) {
-        return availability.getOrDefault(roomType, 0);
-    }
-
-    public Map<String, Integer> getAllAvailability() {
-        return availability;
-    }
-}
-
-/**
- * Search Service
+ * Reservation
  *
- * Provides read-only access to room availability and room details.
+ * Represents a guest booking request.
  */
-class SearchService {
+class Reservation {
 
-    private RoomInventory inventory;
-    private Map<String, Room> roomCatalog;
+    private String guestName;
+    private String roomType;
 
-    public SearchService(RoomInventory inventory, Map<String, Room> roomCatalog) {
-        this.inventory = inventory;
-        this.roomCatalog = roomCatalog;
+    public Reservation(String guestName, String roomType) {
+        this.guestName = guestName;
+        this.roomType = roomType;
+    }
+
+    public String getGuestName() {
+        return guestName;
+    }
+
+    public String getRoomType() {
+        return roomType;
+    }
+
+    public void displayReservation() {
+        System.out.println("Guest: " + guestName + " | Requested Room: " + roomType);
+    }
+}
+
+/**
+ * BookingRequestQueue
+ *
+ * Manages incoming booking requests using FIFO ordering.
+ */
+class BookingRequestQueue {
+
+    private Queue<Reservation> requestQueue;
+
+    public BookingRequestQueue() {
+        requestQueue = new LinkedList<>();
     }
 
     /**
-     * Displays only available rooms
+     * Add booking request to queue
      */
-    public void displayAvailableRooms() {
+    public void addRequest(Reservation reservation) {
 
-        System.out.println("Available Rooms:\n");
+        requestQueue.add(reservation);
+        System.out.println("Booking request received from " + reservation.getGuestName());
+    }
 
-        for (Map.Entry<String, Integer> entry : inventory.getAllAvailability().entrySet()) {
+    /**
+     * Display all queued requests
+     */
+    public void displayQueue() {
 
-            String roomType = entry.getKey();
-            int availableCount = entry.getValue();
-
-            // Defensive check: only show rooms with availability > 0
-            if (availableCount > 0) {
-
-                Room room = roomCatalog.get(roomType);
-
-                room.displayDetails();
-                System.out.println("Available Rooms: " + availableCount);
-                System.out.println();
-            }
+        for (Reservation reservation : requestQueue) {
+            reservation.displayReservation();
         }
     }
 }
