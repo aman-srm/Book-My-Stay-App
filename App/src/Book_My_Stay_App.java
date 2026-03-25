@@ -1,161 +1,143 @@
 /**
- * ConcurrentBookingApp
+ * BookingPersistenceApp
  *
- * Demonstrates race conditions and synchronization in booking systems.
+ * Demonstrates persistence and recovery using serialization.
  *
  * Concepts:
- * - Multi-threading
- * - Race conditions
- * - Critical sections
- * - Synchronized methods
- * - Thread-safe inventory updates
+ * - Stateful applications
+ * - Serialization / Deserialization
+ * - File persistence
+ * - Recovery after restart
+ * - Failure tolerance
  *
  * @author Aman Jain
  */
 
+import java.io.*;
 import java.util.*;
 
 public class Book_My_Stay_App {
 
+    private static final String FILE_NAME = "system_state.ser";
+
     public static void main(String[] args) {
 
-        System.out.println("=== WITHOUT SYNCHRONIZATION (RACE CONDITION) ===");
-        runTest(false);
+        SystemState state;
 
-        System.out.println("\n=== WITH SYNCHRONIZATION (THREAD SAFE) ===");
-        runTest(true);
-    }
+        // 🔄 TRY TO LOAD PREVIOUS STATE
+        state = PersistenceService.load();
 
-    private static void runTest(boolean useSync) {
-
-        InventoryService inventory = new InventoryService();
-        BookingQueue queue = new BookingQueue();
-
-        // Only 1 room available → perfect to expose race condition
-        inventory.setAvailability("Single", 1);
-
-        // Add multiple requests
-        queue.add(new Reservation("User1", "Single"));
-        queue.add(new Reservation("User2", "Single"));
-        queue.add(new Reservation("User3", "Single"));
-
-        Runnable task = () -> {
-            while (true) {
-                Reservation r = queue.get();
-                if (r == null) break;
-
-                if (useSync) {
-                    BookingProcessor.processSync(r, inventory);
-                } else {
-                    BookingProcessor.processUnsafe(r, inventory);
-                }
-            }
-        };
-
-        // Simulate multiple users (threads)
-        Thread t1 = new Thread(task);
-        Thread t2 = new Thread(task);
-        Thread t3 = new Thread(task);
-
-        t1.start(); t2.start(); t3.start();
-
-        try {
-            t1.join(); t2.join(); t3.join();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-    }
-}
-
-/**
- * Reservation
- */
-class Reservation {
-    String guest;
-    String roomType;
-
-    public Reservation(String guest, String roomType) {
-        this.guest = guest;
-        this.roomType = roomType;
-    }
-}
-
-/**
- * Shared Queue (Thread-Safe)
- */
-class BookingQueue {
-
-    private Queue<Reservation> queue = new LinkedList<>();
-
-    public synchronized void add(Reservation r) {
-        queue.add(r);
-    }
-
-    public synchronized Reservation get() {
-        return queue.poll();
-    }
-}
-
-/**
- * Inventory (Shared Mutable State)
- */
-class InventoryService {
-
-    private Map<String, Integer> availability = new HashMap<>();
-
-    public void setAvailability(String type, int count) {
-        availability.put(type, count);
-    }
-
-    public int get(String type) {
-        return availability.getOrDefault(type, 0);
-    }
-
-    public void decrement(String type) {
-        availability.put(type, availability.get(type) - 1);
-    }
-}
-
-/**
- * Booking Processor
- */
-class BookingProcessor {
-
-    // ❌ UNSAFE METHOD (Race Condition)
-    public static void processUnsafe(Reservation r, InventoryService inv) {
-
-        if (inv.get(r.roomType) > 0) {
-
-            // Simulate delay → increases race chance
-            try { Thread.sleep(50); } catch (Exception e) {}
-
-            inv.decrement(r.roomType);
-
-            System.out.println(Thread.currentThread().getName()
-                    + " BOOKED (UNSAFE): " + r.guest);
+        if (state == null) {
+            System.out.println("No previous state found. Starting fresh...");
+            state = new SystemState();
         } else {
-            System.out.println(Thread.currentThread().getName()
-                    + " FAILED: " + r.guest);
+            System.out.println("State restored successfully!");
+        }
+
+        BookingService bookingService = new BookingService(state);
+
+        // Simulate new bookings
+        bookingService.confirmBooking("Alice", "Single");
+        bookingService.confirmBooking("Bob", "Double");
+
+        // Show current state
+        System.out.println("\nCurrent Inventory: " + state.inventory);
+        System.out.println("Booking History: " + state.history);
+
+        // 💾 SAVE STATE BEFORE SHUTDOWN
+        PersistenceService.save(state);
+
+        System.out.println("\nSystem state saved. Restart app to see recovery.");
+    }
+}
+
+/**
+ * System State (Serializable)
+ */
+class SystemState implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    Map<String, Integer> inventory = new HashMap<>();
+    List<String> history = new ArrayList<>();
+
+    public SystemState() {
+        inventory.put("Single", 2);
+        inventory.put("Double", 1);
+    }
+}
+
+/**
+ * Booking Service
+ */
+class BookingService {
+
+    private SystemState state;
+
+    public BookingService(SystemState state) {
+        this.state = state;
+    }
+
+    public void confirmBooking(String guest, String roomType) {
+
+        if (!state.inventory.containsKey(roomType)) {
+            System.out.println("Invalid room type");
+            return;
+        }
+
+        if (state.inventory.get(roomType) <= 0) {
+            System.out.println("No rooms available for " + roomType);
+            return;
+        }
+
+        // Allocate
+        state.inventory.put(roomType, state.inventory.get(roomType) - 1);
+
+        String record = guest + " booked " + roomType;
+        state.history.add(record);
+
+        System.out.println("Booking Confirmed: " + record);
+    }
+}
+
+/**
+ * Persistence Service
+ */
+class PersistenceService {
+
+    private static final String FILE_NAME = "system_state.ser";
+
+    // SAVE STATE
+    public static void save(SystemState state) {
+
+        try (ObjectOutputStream oos =
+                     new ObjectOutputStream(new FileOutputStream(FILE_NAME))) {
+
+            oos.writeObject(state);
+            System.out.println("State saved to file.");
+
+        } catch (IOException e) {
+            System.out.println("Error saving state: " + e.getMessage());
         }
     }
 
-    // ✅ SAFE METHOD (SYNCHRONIZED CRITICAL SECTION)
-    public static void processSync(Reservation r, InventoryService inv) {
+    // LOAD STATE
+    public static SystemState load() {
 
-        synchronized (inv) { // CRITICAL SECTION
+        File file = new File(FILE_NAME);
 
-            if (inv.get(r.roomType) > 0) {
+        if (!file.exists()) {
+            return null; // no previous state
+        }
 
-                try { Thread.sleep(50); } catch (Exception e) {}
+        try (ObjectInputStream ois =
+                     new ObjectInputStream(new FileInputStream(FILE_NAME))) {
 
-                inv.decrement(r.roomType);
+            return (SystemState) ois.readObject();
 
-                System.out.println(Thread.currentThread().getName()
-                        + " BOOKED (SAFE): " + r.guest);
-            } else {
-                System.out.println(Thread.currentThread().getName()
-                        + " FAILED: " + r.guest);
-            }
+        } catch (Exception e) {
+            System.out.println("Corrupted or invalid file. Starting fresh.");
+            return null; // fail safely
         }
     }
 }
